@@ -915,6 +915,7 @@ CONTAINS
                         mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                      END DO
                   CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+                     CALL apply_d_sign_fix(mos_sgf, particle_set, kind_set)
                   DO i = 1, nsgf
                      mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                   END DO
@@ -937,6 +938,7 @@ CONTAINS
                         mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                      END DO
                      CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+                     CALL apply_d_sign_fix(mos_sgf, particle_set, kind_set)
                      DO i = 1, nsgf
                         mo_coefficient_im(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                      END DO
@@ -975,6 +977,7 @@ CONTAINS
                      mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                   END DO
                CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+               CALL apply_d_sign_fix(mos_sgf, particle_set, kind_set)
                DO i = 1, nsgf
                   mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                END DO
@@ -1707,6 +1710,58 @@ CONTAINS
       END DO ! iatom
 
    END SUBROUTINE cartesian_to_spherical_mo
+
+! **************************************************************************************************
+!> \brief Apply phase correction to d-shell spherical harmonics to match PySCF sign convention
+!> \param mos_sgf MO coefficients in spherical AO basis (CP2K ordering)
+!> \param particle_set the set of particles in the system
+!> \param qs_kind_set the set of qs_kinds in the system
+! **************************************************************************************************
+   SUBROUTINE apply_d_sign_fix(mos_sgf, particle_set, qs_kind_set)
+      REAL(KIND=dp), DIMENSION(:, :), INTENT(INOUT)      :: mos_sgf
+      TYPE(particle_type), DIMENSION(:), INTENT(IN), &
+         POINTER                                         :: particle_set
+      TYPE(qs_kind_type), DIMENSION(:), INTENT(IN), &
+         POINTER                                         :: qs_kind_set
+
+      INTEGER                                            :: iatom, ikind, iset, ishell, lshell
+      INTEGER                                            :: isgf, nset
+      INTEGER, DIMENSION(:), POINTER                     :: nshell
+      INTEGER, DIMENSION(:, :), POINTER                  :: l
+      TYPE(gto_basis_set_type), POINTER                  :: orb_basis_set
+
+      isgf = 1
+      DO iatom = 1, SIZE(particle_set)
+         NULLIFY (orb_basis_set)
+         CALL get_atomic_kind(particle_set(iatom)%atomic_kind, kind_number=ikind)
+         CALL get_qs_kind(qs_kind_set(ikind), basis_set=orb_basis_set)
+
+         IF (ASSOCIATED(orb_basis_set)) THEN
+            CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
+                                   nset=nset, &
+                                   nshell=nshell, &
+                                   l=l)
+            DO iset = 1, nset
+               DO ishell = 1, nshell(iset)
+                  lshell = l(ishell, iset)
+                  IF (lshell == 2) THEN
+                     ! CP2K ordering m=-2,-1,0,+1,+2. Flip m=±2 to align with PySCF.
+                     mos_sgf(isgf,   :) = -mos_sgf(isgf,   :)
+                     mos_sgf(isgf+4, :) = -mos_sgf(isgf+4, :)
+                     isgf = isgf + 5
+                  ELSE
+                     isgf = isgf + nso(lshell)
+                  END IF
+               END DO
+            END DO
+         ELSE
+            CPABORT("Unknown basis set type")
+         END IF
+      END DO
+
+      CPASSERT(isgf - 1 == SIZE(mos_sgf, 1))
+
+   END SUBROUTINE apply_d_sign_fix
 
 ! **************************************************************************************************
 !> \brief Computes a spherical to cartesian MO transformation using s2c matrix (inverse of c2s)
