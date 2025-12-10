@@ -915,7 +915,7 @@ CONTAINS
                         mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                      END DO
                   CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
-                     CALL apply_d_sign_fix(mos_sgf, particle_set, kind_set)
+                  CALL flip_negative_m_phase(mos_sgf, particle_set, kind_set)
                   DO i = 1, nsgf
                      mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                   END DO
@@ -938,7 +938,7 @@ CONTAINS
                         mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                      END DO
                      CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
-                     CALL apply_d_sign_fix(mos_sgf, particle_set, kind_set)
+                     CALL flip_negative_m_phase(mos_sgf, particle_set, kind_set)
                      DO i = 1, nsgf
                         mo_coefficient_im(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                      END DO
@@ -977,7 +977,7 @@ CONTAINS
                      mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                   END DO
                CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
-               CALL apply_d_sign_fix(mos_sgf, particle_set, kind_set)
+               CALL flip_negative_m_phase(mos_sgf, particle_set, kind_set)
                DO i = 1, nsgf
                   mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                END DO
@@ -1712,12 +1712,12 @@ CONTAINS
    END SUBROUTINE cartesian_to_spherical_mo
 
 ! **************************************************************************************************
-!> \brief Apply phase correction to d-shell spherical harmonics to match PySCF sign convention
+!> \brief Flip sign for negative m components in spherical harmonics (to match PySCF real SH phase)
 !> \param mos_sgf MO coefficients in spherical AO basis (CP2K ordering)
 !> \param particle_set the set of particles in the system
 !> \param qs_kind_set the set of qs_kinds in the system
 ! **************************************************************************************************
-   SUBROUTINE apply_d_sign_fix(mos_sgf, particle_set, qs_kind_set)
+   SUBROUTINE flip_negative_m_phase(mos_sgf, particle_set, qs_kind_set)
       REAL(KIND=dp), DIMENSION(:, :), INTENT(INOUT)      :: mos_sgf
       TYPE(particle_type), DIMENSION(:), INTENT(IN), &
          POINTER                                         :: particle_set
@@ -1744,14 +1744,11 @@ CONTAINS
             DO iset = 1, nset
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
-                  IF (lshell == 2) THEN
-                     ! CP2K ordering m=-2,-1,0,+1,+2. Flip m=±2 to align with PySCF.
-                     mos_sgf(isgf,   :) = -mos_sgf(isgf,   :)
-                     mos_sgf(isgf+4, :) = -mos_sgf(isgf+4, :)
-                     isgf = isgf + 5
-                  ELSE
-                     isgf = isgf + nso(lshell)
+                  ! CP2K ordering: m = -lshell,...,-1,0,1,...,lshell
+                  IF (lshell > 0) THEN
+                     mos_sgf(isgf:isgf + lshell - 1, :) = -mos_sgf(isgf:isgf + lshell - 1, :)
                   END IF
+                  isgf = isgf + nso(lshell)
                END DO
             END DO
          ELSE
@@ -1761,7 +1758,7 @@ CONTAINS
 
       CPASSERT(isgf - 1 == SIZE(mos_sgf, 1))
 
-   END SUBROUTINE apply_d_sign_fix
+   END SUBROUTINE flip_negative_m_phase
 
 ! **************************************************************************************************
 !> \brief Computes a spherical to cartesian MO transformation using s2c matrix (inverse of c2s)
