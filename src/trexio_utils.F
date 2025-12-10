@@ -902,7 +902,7 @@ CONTAINS
                CALL cp_fm_get_submatrix(fm_mo_coeff, mos_sgf, 1, imo + 1, nsgf, nmo)
                IF (save_cartesian) THEN
                   ALLOCATE (mos_cgf(ncgf, nmo))
-                  CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+                  CALL spherical_to_cartesian_mo_s2c(mos_sgf, particle_set, kind_set, mos_cgf)
                   DO i = 1, ncgf
                      mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                   END DO
@@ -910,7 +910,7 @@ CONTAINS
                   DEALLOCATE (mos_cgf)
                ELSE
                   ALLOCATE (mos_cgf(ncgf, nmo))
-                  CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+                  CALL spherical_to_cartesian_mo_s2c(mos_sgf, particle_set, kind_set, mos_cgf)
                   DO i = 1, ncgf
                      mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                   END DO
@@ -924,7 +924,7 @@ CONTAINS
                   CALL cp_fm_get_submatrix(fm_mo_coeff_im, mos_sgf, 1, imo + 1, nsgf, nmo)
                   IF (save_cartesian) THEN
                      ALLOCATE (mos_cgf(ncgf, nmo))
-                     CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+                     CALL spherical_to_cartesian_mo_s2c(mos_sgf, particle_set, kind_set, mos_cgf)
                      DO i = 1, ncgf
                         mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                      END DO
@@ -932,7 +932,7 @@ CONTAINS
                      DEALLOCATE (mos_cgf)
                   ELSE
                      ALLOCATE (mos_cgf(ncgf, nmo))
-                     CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+                     CALL spherical_to_cartesian_mo_s2c(mos_sgf, particle_set, kind_set, mos_cgf)
                      DO i = 1, ncgf
                         mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                      END DO
@@ -962,7 +962,7 @@ CONTAINS
 
             IF (save_cartesian) THEN
                ALLOCATE (mos_cgf(ncgf, nmo))
-               CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+               CALL spherical_to_cartesian_mo_s2c(mos_sgf, particle_set, kind_set, mos_cgf)
                DO i = 1, ncgf
                   mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                END DO
@@ -970,7 +970,7 @@ CONTAINS
                DEALLOCATE (mos_cgf)
             ELSE
                ALLOCATE (mos_cgf(ncgf, nmo))
-               CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+               CALL spherical_to_cartesian_mo_s2c(mos_sgf, particle_set, kind_set, mos_cgf)
                DO i = 1, ncgf
                   mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                END DO
@@ -1631,7 +1631,7 @@ CONTAINS
             CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
                                    nset=nset, &
                                    nshell=nshell, &
-                                   l=l_shell_set)
+                                   l=l)
             DO iset = 1, nset
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
@@ -1689,7 +1689,7 @@ CONTAINS
             CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
                                    nset=nset, &
                                    nshell=nshell, &
-                                   l=l_shell_set)
+                                   l=l)
             DO iset = 1, nset
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
@@ -1746,7 +1746,7 @@ CONTAINS
             CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
                                    nset=nset, &
                                    nshell=nshell, &
-                                   l=l_shell_set)
+                                   l=l)
             DO iset = 1, nset
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
