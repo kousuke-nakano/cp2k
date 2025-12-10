@@ -647,8 +647,14 @@ CONTAINS
          DO ishell = 1, shell_num
             l = shell_ang_mom(ishell)
             DO k = 1, 2*l + 1
-               m = (-1)**k*FLOOR(REAL(k, KIND=dp)/2.0_dp)
-               cp2k_to_trexio_ang_mom(i + k) = i + l + 1 + m
+               m = k - (l + 1)                ! CP2K ordering: m = -l, ..., 0, ..., +l
+               IF (m == 0) THEN
+                  cp2k_to_trexio_ang_mom(i + k) = i + 1          ! TREXIO m = 0 first
+               ELSEIF (m > 0) THEN
+                  cp2k_to_trexio_ang_mom(i + k) = i + 2*m        ! TREXIO m = +1, +2, ... even positions
+               ELSE
+                  cp2k_to_trexio_ang_mom(i + k) = i + 2*ABS(m) + 1 ! TREXIO m = -1, -2, ... odd positions
+               END IF
             END DO
             i = i + 2*l + 1
          END DO
