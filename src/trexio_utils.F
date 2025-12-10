@@ -176,7 +176,7 @@ CONTAINS
       INTEGER, DIMENSION(:, :), POINTER                  :: l_shell_set
       REAL(KIND=dp), DIMENSION(:), ALLOCATABLE           :: charge, shell_factor, exponents, coefficients, &
                                  prim_factor, ao_normalization, mo_energy, &
-                                 mo_occupation, norm_cgf_all
+                                 mo_occupation, norm_cgf_all, ao_normalization_tmp
       REAL(KIND=dp), DIMENSION(:), POINTER               :: wkp, norm_cgf
       REAL(KIND=dp), DIMENSION(:, :), ALLOCATABLE        :: coord, mo_coefficient, mo_coefficient_im, &
                                                             mos_sgf, mos_cgf, dEdP, ao_overlap
@@ -693,8 +693,15 @@ CONTAINS
                IF (save_cartesian) THEN
                   ao_normalization(igf + 1:igf + ngf_shell) = norm_cgf(icgf + 1:icgf + ngf_shell)
                ELSE
-                  ! spherical AOs: normalization applied via MO scaling, keep factors as unity
-                  ao_normalization(igf + 1:igf + ngf_shell) = 1.0_dp
+                  ! spherical AOs: derive normalization from Cartesian norm_cgf and c2s mixing
+                  DO i = 1, ngf_shell
+                     ao_normalization(igf + i) = 0.0_dp
+                     DO j = 1, nco(lshell)
+                        ao_normalization(igf + i) = ao_normalization(igf + i) + &
+                           (orbtramat(lshell)%c2s(i, j)*norm_cgf(icgf + j))**2
+                     END DO
+                     ao_normalization(igf + i) = SQRT(ao_normalization(igf + i))
+                  END DO
                END IF
 
                igf = igf + ngf_shell
@@ -704,6 +711,16 @@ CONTAINS
          ! just a failsafe check
          CPASSERT(icgf == ncgf)
       END DO
+
+      ! reorder spherical AO normalizations to TREXIO ordering
+      IF (.NOT. save_cartesian) THEN
+         ALLOCATE (ao_normalization_tmp(ao_num))
+         ao_normalization_tmp(:) = ao_normalization(:)
+         DO i = 1, nsgf
+            ao_normalization(cp2k_to_trexio_ang_mom(i)) = ao_normalization_tmp(i)
+         END DO
+         DEALLOCATE (ao_normalization_tmp)
+      END IF
 
       ! write overlap
       CALL get_qs_env(qs_env, do_kpoints=do_kpoints, dft_control=dft_control)
@@ -915,7 +932,6 @@ CONTAINS
                         mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                      END DO
                   CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
-                  CALL flip_negative_m_phase(mos_sgf, particle_set, kind_set)
                   DO i = 1, nsgf
                      mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                   END DO
@@ -938,7 +954,6 @@ CONTAINS
                         mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                      END DO
                      CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
-                     CALL flip_negative_m_phase(mos_sgf, particle_set, kind_set)
                      DO i = 1, nsgf
                         mo_coefficient_im(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                      END DO
@@ -977,7 +992,6 @@ CONTAINS
                      mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                   END DO
                CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
-               CALL flip_negative_m_phase(mos_sgf, particle_set, kind_set)
                DO i = 1, nsgf
                   mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                END DO
@@ -1711,54 +1725,6 @@ CONTAINS
 
    END SUBROUTINE cartesian_to_spherical_mo
 
-! **************************************************************************************************
-!> \brief Flip sign for negative m components in spherical harmonics (to match PySCF real SH phase)
-!> \param mos_sgf MO coefficients in spherical AO basis (CP2K ordering)
-!> \param particle_set the set of particles in the system
-!> \param qs_kind_set the set of qs_kinds in the system
-! **************************************************************************************************
-   SUBROUTINE flip_negative_m_phase(mos_sgf, particle_set, qs_kind_set)
-      REAL(KIND=dp), DIMENSION(:, :), INTENT(INOUT)      :: mos_sgf
-      TYPE(particle_type), DIMENSION(:), INTENT(IN), &
-         POINTER                                         :: particle_set
-      TYPE(qs_kind_type), DIMENSION(:), INTENT(IN), &
-         POINTER                                         :: qs_kind_set
-
-      INTEGER                                            :: iatom, ikind, iset, ishell, lshell
-      INTEGER                                            :: isgf, nset
-      INTEGER, DIMENSION(:), POINTER                     :: nshell
-      INTEGER, DIMENSION(:, :), POINTER                  :: l
-      TYPE(gto_basis_set_type), POINTER                  :: orb_basis_set
-
-      isgf = 1
-      DO iatom = 1, SIZE(particle_set)
-         NULLIFY (orb_basis_set)
-         CALL get_atomic_kind(particle_set(iatom)%atomic_kind, kind_number=ikind)
-         CALL get_qs_kind(qs_kind_set(ikind), basis_set=orb_basis_set)
-
-         IF (ASSOCIATED(orb_basis_set)) THEN
-            CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
-                                   nset=nset, &
-                                   nshell=nshell, &
-                                   l=l)
-            DO iset = 1, nset
-               DO ishell = 1, nshell(iset)
-                  lshell = l(ishell, iset)
-                  ! CP2K ordering: m = -lshell,...,-1,0,1,...,lshell
-                  IF (lshell > 0) THEN
-                     mos_sgf(isgf:isgf + lshell - 1, :) = -mos_sgf(isgf:isgf + lshell - 1, :)
-                  END IF
-                  isgf = isgf + nso(lshell)
-               END DO
-            END DO
-         ELSE
-            CPABORT("Unknown basis set type")
-         END IF
-      END DO
-
-      CPASSERT(isgf - 1 == SIZE(mos_sgf, 1))
-
-   END SUBROUTINE flip_negative_m_phase
 
 ! **************************************************************************************************
 !> \brief Computes a spherical to cartesian MO transformation using s2c matrix (inverse of c2s)
