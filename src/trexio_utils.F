@@ -928,7 +928,13 @@ CONTAINS
                ! transform and store the MO coefficients
                CALL cp_fm_get_submatrix(fm_mo_coeff, mos_sgf, 1, imo + 1, nsgf, nmo)
                IF (save_cartesian) THEN
-                  CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mo_coefficient(:, imo + 1:imo + nmo))
+                  ALLOCATE (mos_cgf(ncgf, nmo))
+                  CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+                  DO i = 1, ncgf
+                     mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+                  END DO
+                  mo_coefficient(:, imo + 1:imo + nmo) = mos_cgf(:, :)
+                  DEALLOCATE (mos_cgf)
                ELSE
                   ALLOCATE (mos_cgf(ncgf, nmo))
                   ALLOCATE (mos_sgf_norm(nsgf, nmo))
@@ -952,7 +958,13 @@ CONTAINS
                IF (.NOT. use_real_wfn) THEN
                   CALL cp_fm_get_submatrix(fm_mo_coeff_im, mos_sgf, 1, imo + 1, nsgf, nmo)
                   IF (save_cartesian) THEN
-                     CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mo_coefficient_im(:, imo + 1:imo + nmo))
+                     ALLOCATE (mos_cgf(ncgf, nmo))
+                     CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+                     DO i = 1, ncgf
+                        mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+                     END DO
+                     mo_coefficient_im(:, imo + 1:imo + nmo) = mos_cgf(:, :)
+                     DEALLOCATE (mos_cgf)
                   ELSE
                      ALLOCATE (mos_cgf(ncgf, nmo))
                      ALLOCATE (mos_sgf_norm(nsgf, nmo))
@@ -989,7 +1001,13 @@ CONTAINS
             CALL cp_fm_get_submatrix(mos(ispin)%mo_coeff, mos_sgf)
 
             IF (save_cartesian) THEN
-               CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mo_coefficient(:, imo + 1:imo + nmo))
+               ALLOCATE (mos_cgf(ncgf, nmo))
+               CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+               DO i = 1, ncgf
+                  mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+               END DO
+               mo_coefficient(:, imo + 1:imo + nmo) = mos_cgf(:, :)
+               DEALLOCATE (mos_cgf)
             ELSE
                ALLOCATE (mos_cgf(ncgf, nmo))
                ALLOCATE (mos_sgf_norm(nsgf, nmo))
