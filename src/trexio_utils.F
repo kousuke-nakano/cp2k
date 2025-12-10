@@ -911,10 +911,10 @@ CONTAINS
                ELSE
                   ALLOCATE (mos_cgf(ncgf, nmo))
                   CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-                  DO i = 1, ncgf
-                     mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-                  END DO
-                  CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+                     DO i = 1, ncgf
+                        mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+                     END DO
+                     CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                   DO i = 1, nsgf
                      mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                   END DO
@@ -976,7 +976,7 @@ CONTAINS
                DO i = 1, ncgf
                   mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                END DO
-               CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+                  CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                DO i = 1, nsgf
                   mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                END DO
@@ -1637,8 +1637,8 @@ CONTAINS
             DO iset = 1, nset
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
-                  CALL dgemm("N", "N", nco(lshell), nmo, nso(lshell), 1.0_dp, &
-                             orbtramat(lshell)%s2c, nco(lshell), &
+                  CALL dgemm("T", "N", nco(lshell), nmo, nso(lshell), 1.0_dp, &
+                             orbtramat(lshell)%c2s, nso(lshell), &
                              mos_sgf(isgf, 1), nsgf, 0.0_dp, &
                              mos_cgf(icgf, 1), ncgf)
                   icgf = icgf + nco(lshell)
