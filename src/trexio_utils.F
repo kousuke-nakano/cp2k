@@ -911,17 +911,15 @@ CONTAINS
                ELSE
                   ALLOCATE (mos_cgf(ncgf, nmo))
                   CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-                     DO i = 1, ncgf
-                        mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-                     END DO
-                     CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+                  DO i = 1, ncgf
+                     mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+                  END DO
+                  CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                   DO i = 1, nsgf
                      mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                   END DO
                   DEALLOCATE (mos_cgf)
-               END IF
-
-               ! we have to do it for the imaginary part as well
+               END IF               ! we have to do it for the imaginary part as well
                IF (.NOT. use_real_wfn) THEN
                   CALL cp_fm_get_submatrix(fm_mo_coeff_im, mos_sgf, 1, imo + 1, nsgf, nmo)
                   IF (save_cartesian) THEN
@@ -1191,7 +1189,7 @@ CONTAINS
 
       ! Open the TREXIO file and check that we have the same molecule as in qs_env
       IF (ionode) THEN
-         WRITE (output_unit, "((T2,A,A))") 'TREXIO| Opening file named ', TRIM(filename)
+         WRITE (output_unit, "((T2,A))") 'TREXIO| Opening file named ', TRIM(filename)
          f = trexio_open(filename, 'r', TREXIO_HDF5, rc)
          CALL trexio_error(rc)
 
@@ -1633,7 +1631,7 @@ CONTAINS
             CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
                                    nset=nset, &
                                    nshell=nshell, &
-                                   l=l)
+                                   l=l_shell_set)
             DO iset = 1, nset
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
@@ -1691,7 +1689,7 @@ CONTAINS
             CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
                                    nset=nset, &
                                    nshell=nshell, &
-                                   l=l)
+                                   l=l_shell_set)
             DO iset = 1, nset
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
@@ -1709,6 +1707,64 @@ CONTAINS
       END DO ! iatom
 
    END SUBROUTINE cartesian_to_spherical_mo
+
+! **************************************************************************************************
+!> \brief Computes a spherical to cartesian MO transformation using s2c matrix (inverse of c2s)
+!> \param mos_sgf the MO coefficients in spherical AO basis
+!> \param particle_set the set of particles in the system
+!> \param qs_kind_set the set of qs_kinds in the system
+!> \param mos_cgf the transformed MO coefficients in Cartesian AO basis
+! **************************************************************************************************
+   SUBROUTINE spherical_to_cartesian_mo_s2c(mos_sgf, particle_set, qs_kind_set, mos_cgf)
+      REAL(KIND=dp), DIMENSION(:, :), INTENT(IN)         :: mos_sgf
+      TYPE(particle_type), DIMENSION(:), INTENT(IN), &
+         POINTER                                         :: particle_set
+      TYPE(qs_kind_type), DIMENSION(:), INTENT(IN), &
+         POINTER                                         :: qs_kind_set
+      REAL(KIND=dp), DIMENSION(:, :), INTENT(OUT)        :: mos_cgf
+
+      INTEGER                                            :: iatom, icgf, ikind, iset, isgf, ishell, &
+                                                            lshell, ncgf, nmo, nset, nsgf
+      INTEGER, DIMENSION(:), POINTER                     :: nshell
+      INTEGER, DIMENSION(:, :), POINTER                  :: l
+      TYPE(gto_basis_set_type), POINTER                  :: orb_basis_set
+
+      CALL get_qs_kind_set(qs_kind_set, ncgf=ncgf, nsgf=nsgf)
+
+      mos_cgf = 0.0_dp
+      nmo = SIZE(mos_sgf, 2)
+
+      ! Transform spherical MOs to Cartesian MOs using s2c
+      icgf = 1
+      isgf = 1
+      DO iatom = 1, SIZE(particle_set)
+         NULLIFY (orb_basis_set)
+         CALL get_atomic_kind(particle_set(iatom)%atomic_kind, kind_number=ikind)
+         CALL get_qs_kind(qs_kind_set(ikind), basis_set=orb_basis_set)
+
+         IF (ASSOCIATED(orb_basis_set)) THEN
+            CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
+                                   nset=nset, &
+                                   nshell=nshell, &
+                                   l=l_shell_set)
+            DO iset = 1, nset
+               DO ishell = 1, nshell(iset)
+                  lshell = l(ishell, iset)
+                  CALL dgemm("T", "N", nco(lshell), nmo, nso(lshell), 1.0_dp, &
+                             orbtramat(lshell)%s2c, nso(lshell), &
+                             mos_sgf(isgf, 1), nsgf, 0.0_dp, &
+                             mos_cgf(icgf, 1), ncgf)
+                  icgf = icgf + nco(lshell)
+                  isgf = isgf + nso(lshell)
+               END DO
+            END DO
+         ELSE
+            ! assume atom without basis set
+            CPABORT("Unknown basis set type")
+         END IF
+      END DO ! iatom
+
+   END SUBROUTINE spherical_to_cartesian_mo_s2c
 #endif
 
 END MODULE trexio_utils
