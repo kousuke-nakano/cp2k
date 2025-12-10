@@ -165,7 +165,7 @@ CONTAINS
                                                             mo_num, ispin, ikp, imo, ikp_loc, nsgf, &
                                                             i, j, k, l, m, unit_dE, &
                                                             row, col, row_size, col_size, &
-                                                            row_offset, col_offset, i_trex
+                                                            row_offset, col_offset
       INTEGER, DIMENSION(2)                              :: nel_spin, kp_range, nmo_spin
       INTEGER, DIMENSION(0:10)                           :: npot
       INTEGER, DIMENSION(:), ALLOCATABLE                 :: nucleus_index, shell_ang_mom, r_power, &
@@ -1637,8 +1637,8 @@ CONTAINS
             DO iset = 1, nset
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
-                  CALL dgemm("T", "N", nco(lshell), nmo, nso(lshell), 1.0_dp, &
-                             orbtramat(lshell)%c2s, nso(lshell), &
+                  CALL dgemm("N", "N", nco(lshell), nmo, nso(lshell), 1.0_dp, &
+                             orbtramat(lshell)%s2c, nco(lshell), &
                              mos_sgf(isgf, 1), nsgf, 0.0_dp, &
                              mos_cgf(icgf, 1), ncgf)
                   icgf = icgf + nco(lshell)
