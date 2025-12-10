@@ -940,9 +940,6 @@ CONTAINS
                   ALLOCATE (mos_sgf_norm(nsgf, nmo))
 
                   CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-                  DO i = 1, ncgf
-                     mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-                  END DO
                   CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf_norm)
 
                   ! reorder to TREXIO convention
@@ -970,9 +967,6 @@ CONTAINS
                      ALLOCATE (mos_sgf_norm(nsgf, nmo))
 
                      CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-                     DO i = 1, ncgf
-                        mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-                     END DO
                      CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf_norm)
 
                      DO i = 1, nsgf
@@ -1013,9 +1007,6 @@ CONTAINS
                ALLOCATE (mos_sgf_norm(nsgf, nmo))
 
                CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-               DO i = 1, ncgf
-                  mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-               END DO
                CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf_norm)
 
                DO i = 1, nsgf
