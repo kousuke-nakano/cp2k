@@ -179,7 +179,7 @@ CONTAINS
                                  mo_occupation, norm_cgf_all
       REAL(KIND=dp), DIMENSION(:), POINTER               :: wkp, norm_cgf
       REAL(KIND=dp), DIMENSION(:, :), ALLOCATABLE        :: coord, mo_coefficient, mo_coefficient_im, &
-                                                            mos_sgf, mos_cgf, mos_cgf, diag_nsgf, diag_ncgf, &
+                                                            mos_sgf, mos_cgf, mos_sgf_norm, diag_nsgf, diag_ncgf, &
                                                             temp, dEdP, ao_overlap
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: zetas, data_block, xkp
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: gcc
@@ -694,7 +694,6 @@ CONTAINS
                IF (save_cartesian) THEN
                   ao_normalization(igf + 1:igf + ngf_shell) = norm_cgf(icgf + 1:icgf + ngf_shell)
                ELSE
-<<<<<<< HEAD
                   ! allocate some temporary arrays
                   ALLOCATE (diag_ncgf(nco(lshell), nco(lshell)))
                   ALLOCATE (diag_nsgf(nso(lshell), nso(lshell)))
@@ -721,10 +720,8 @@ CONTAINS
                   DEALLOCATE (diag_ncgf)
                   DEALLOCATE (diag_nsgf)
                   DEALLOCATE (temp)
-=======
                   ! set normalization factors to unity; normalization handled later via norm_cgf on MOs
                   ao_normalization(igf + 1:igf + ngf_shell) = 1.0_dp
->>>>>>> master
                END IF
 
                igf = igf + ngf_shell
