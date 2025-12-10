@@ -179,8 +179,7 @@ CONTAINS
                                  mo_occupation, norm_cgf_all
       REAL(KIND=dp), DIMENSION(:), POINTER               :: wkp, norm_cgf
       REAL(KIND=dp), DIMENSION(:, :), ALLOCATABLE        :: coord, mo_coefficient, mo_coefficient_im, &
-                                                            mos_sgf, mos_cgf, mos_sgf_norm, diag_nsgf, diag_ncgf, &
-                                                            temp, dEdP, ao_overlap
+                                                            mos_sgf, mos_cgf, dEdP, ao_overlap
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: zetas, data_block, xkp
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: gcc
 
@@ -694,33 +693,7 @@ CONTAINS
                IF (save_cartesian) THEN
                   ao_normalization(igf + 1:igf + ngf_shell) = norm_cgf(icgf + 1:icgf + ngf_shell)
                ELSE
-                  ! allocate some temporary arrays
-                  ALLOCATE (diag_ncgf(nco(lshell), nco(lshell)))
-                  ALLOCATE (diag_nsgf(nso(lshell), nso(lshell)))
-                  ALLOCATE (temp(nso(lshell), nco(lshell)))
-                  diag_ncgf = 0.0_dp
-                  diag_nsgf = 0.0_dp
-                  temp = 0.0_dp
-
-                  DO i = 1, nco(lshell)
-                     diag_ncgf(i, i) = norm_cgf(icgf + i)
-                  END DO
-
-                  ! transform the normalization factors from Cartesian to solid harmonics
-                  temp(:, :) = MATMUL(orbtramat(lshell)%c2s, diag_ncgf)
-                  diag_nsgf(:, :) = MATMUL(temp, TRANSPOSE(orbtramat(lshell)%s2c))
-                  DO i = 1, nso(lshell)
-                     ! cp2k_to_trexio contains the mapped global indices, but diag_nsgf
-                     ! is a small local matrix of dimension 2l+1, so I need to shift back
-                     ! the index by igf
-                     i_trex = cp2k_to_trexio_ang_mom(igf+i) - igf
-                     ao_normalization(igf + i) = diag_nsgf(i_trex, i_trex)
-                  END DO
-
-                  DEALLOCATE (diag_ncgf)
-                  DEALLOCATE (diag_nsgf)
-                  DEALLOCATE (temp)
-                  ! set normalization factors to unity; normalization handled later via norm_cgf on MOs
+                  ! spherical AOs: normalization applied via MO scaling, keep factors as unity
                   ao_normalization(igf + 1:igf + ngf_shell) = 1.0_dp
                END IF
 
@@ -937,18 +910,15 @@ CONTAINS
                   DEALLOCATE (mos_cgf)
                ELSE
                   ALLOCATE (mos_cgf(ncgf, nmo))
-                  ALLOCATE (mos_sgf_norm(nsgf, nmo))
-
                   CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-                  CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf_norm)
-
-                  ! reorder to TREXIO convention
-                  DO i = 1, nsgf
-                     mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf_norm(cp2k_to_trexio_ang_mom(i), :)
+                  DO i = 1, ncgf
+                     mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                   END DO
-
+                  CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+                  DO i = 1, nsgf
+                     mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
+                  END DO
                   DEALLOCATE (mos_cgf)
-                  DEALLOCATE (mos_sgf_norm)
                END IF
 
                ! we have to do it for the imaginary part as well
@@ -964,17 +934,15 @@ CONTAINS
                      DEALLOCATE (mos_cgf)
                   ELSE
                      ALLOCATE (mos_cgf(ncgf, nmo))
-                     ALLOCATE (mos_sgf_norm(nsgf, nmo))
-
                      CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-                     CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf_norm)
-
-                     DO i = 1, nsgf
-                        mo_coefficient_im(i, imo + 1:imo + nmo) = mos_sgf_norm(cp2k_to_trexio_ang_mom(i), :)
+                     DO i = 1, ncgf
+                        mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                      END DO
-
+                     CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+                     DO i = 1, nsgf
+                        mo_coefficient_im(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
+                     END DO
                      DEALLOCATE (mos_cgf)
-                     DEALLOCATE (mos_sgf_norm)
                   END IF
                END IF
             END DO
@@ -1004,17 +972,15 @@ CONTAINS
                DEALLOCATE (mos_cgf)
             ELSE
                ALLOCATE (mos_cgf(ncgf, nmo))
-               ALLOCATE (mos_sgf_norm(nsgf, nmo))
-
                CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-               CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf_norm)
-
-               DO i = 1, nsgf
-                  mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf_norm(cp2k_to_trexio_ang_mom(i), :)
+               DO i = 1, ncgf
+                  mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                END DO
-
+               CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+               DO i = 1, nsgf
+                  mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
+               END DO
                DEALLOCATE (mos_cgf)
-               DEALLOCATE (mos_sgf_norm)
             END IF
          END IF
 
