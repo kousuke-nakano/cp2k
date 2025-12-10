@@ -159,7 +159,7 @@ CONTAINS
                                                             nspins, ikind, ishell_loc, ishell, &
                                                             shell_num, prim_num, nset, iset, ipgf, z, &
                                                             sl_lmax, ecp_num, nloc, nsemiloc, sl_l, iecp, &
-                                                            igf, icgf, ncgf, ngf_shell, lshell, ao_num, nmo, &
+                                                            igf, icgf, icgf_loc, ncgf, ngf_shell, lshell, ao_num, nmo, &
                                                             mo_num, ispin, ikp, imo, ikp_loc, nsgf, &
                                                             i, j, k, l, m, unit_dE, &
                                                             row, col, row_size, col_size, &
@@ -174,11 +174,11 @@ CONTAINS
       INTEGER, DIMENSION(:), POINTER                     :: nshell, npgf
       INTEGER, DIMENSION(:, :), POINTER                  :: l_shell_set
       REAL(KIND=dp), DIMENSION(:), ALLOCATABLE           :: charge, shell_factor, exponents, coefficients, &
-                                                            prim_factor, ao_normalization, mo_energy, &
-                                                            mo_occupation
+                                 prim_factor, ao_normalization, mo_energy, &
+                                 mo_occupation, norm_cgf_all
       REAL(KIND=dp), DIMENSION(:), POINTER               :: wkp, norm_cgf
       REAL(KIND=dp), DIMENSION(:, :), ALLOCATABLE        :: coord, mo_coefficient, mo_coefficient_im, &
-                                                            mos_sgf, diag_nsgf, diag_ncgf, temp, dEdP
+                                 mos_sgf, mos_cgf, mos_sgf_norm, temp, dEdP
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: zetas, data_block
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: gcc
 
@@ -672,32 +672,11 @@ CONTAINS
                ! one-to-one mapping between AOs and shells
                ao_shell(igf + 1:igf + ngf_shell) = ishell
 
-               ! one-to-one mapping between AOs and normalization factors
                IF (save_cartesian) THEN
                   ao_normalization(igf + 1:igf + ngf_shell) = norm_cgf(icgf + 1:icgf + ngf_shell)
                ELSE
-                  ! allocate some temporary arrays
-                  ALLOCATE (diag_ncgf(nco(lshell), nco(lshell)))
-                  ALLOCATE (diag_nsgf(nso(lshell), nso(lshell)))
-                  ALLOCATE (temp(nso(lshell), nco(lshell)))
-                  diag_ncgf = 0.0_dp
-                  diag_nsgf = 0.0_dp
-                  temp = 0.0_dp
-
-                  DO i = 1, nco(lshell)
-                     diag_ncgf(i, i) = norm_cgf(icgf + i)
-                  END DO
-
-                  ! transform the normalization factors from Cartesian to solid harmonics
-                  temp(:, :) = MATMUL(orbtramat(lshell)%c2s, diag_ncgf)
-                  diag_nsgf(:, :) = MATMUL(temp, TRANSPOSE(orbtramat(lshell)%s2c))
-                  DO i = 1, nso(lshell)
-                     ao_normalization(igf + i) = diag_nsgf(i, i)
-                  END DO
-
-                  DEALLOCATE (diag_ncgf)
-                  DEALLOCATE (diag_nsgf)
-                  DEALLOCATE (temp)
+                  ! set normalization factors to unity; normalization handled later via norm_cgf on MOs
+                  ao_normalization(igf + 1:igf + ngf_shell) = 1.0_dp
                END IF
 
                igf = igf + ngf_shell
@@ -723,9 +702,9 @@ CONTAINS
       ! MO group
       !========================================================================================!
       CALL get_qs_env(qs_env, do_kpoints=do_kpoints, kpoints=kpoints, dft_control=dft_control, &
-                      particle_set=particle_set, qs_kind_set=kind_set, blacs_env=blacs_env)
+                particle_set=particle_set, qs_kind_set=kind_set, blacs_env=blacs_env)
       nspins = dft_control%nspins
-      CALL get_qs_kind_set(kind_set, nsgf=nsgf)
+      CALL get_qs_kind_set(kind_set, nsgf=nsgf, ncgf=ncgf)
       nmo_spin = 0
 
       ! figure out that total number of MOs
@@ -757,6 +736,32 @@ CONTAINS
          END DO
          mo_num = SUM(nmo_spin)
       END IF
+
+      ! gather Cartesian normalization factors for all CGFs
+      ALLOCATE (norm_cgf_all(ncgf))
+      icgf = 0
+      DO iatom = 1, natoms
+         CALL get_atomic_kind(particle_set(iatom)%atomic_kind, kind_number=ikind)
+         CALL get_qs_kind(kind_set(ikind), basis_set=basis_set, basis_type="ORB")
+         CALL get_gto_basis_set(basis_set, &
+                                nset=nset, &
+                                nshell=nshell, &
+                                norm_cgf=norm_cgf, &
+                                ncgf=ncgf_loc, &
+                                l=l_shell_set)
+
+         icgf_loc = 0
+         DO iset = 1, nset
+            DO ishell_loc = 1, nshell(iset)
+               lshell = l_shell_set(ishell_loc, iset)
+               ngf_shell = nco(lshell)
+               norm_cgf_all(icgf + 1:icgf + ngf_shell) = norm_cgf(icgf_loc + 1:icgf_loc + ngf_shell)
+               icgf = icgf + ngf_shell
+               icgf_loc = icgf_loc + ngf_shell
+            END DO
+         END DO
+      END DO
+      CPASSERT(icgf == ncgf)
 
       ! allocate all the arrays
       ALLOCATE (mo_coefficient(ao_num, mo_num))
@@ -872,10 +877,22 @@ CONTAINS
                IF (save_cartesian) THEN
                   CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mo_coefficient(:, imo + 1:imo + nmo))
                ELSE
-                  ! we have to reorder the MOs since CP2K and TREXIO have different conventions
-                  DO i = 1, nsgf
-                     mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
+                  ALLOCATE (mos_cgf(ncgf, nmo))
+                  ALLOCATE (mos_sgf_norm(nsgf, nmo))
+
+                  CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+                  DO i = 1, ncgf
+                     mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                   END DO
+                  CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf_norm)
+
+                  ! reorder to TREXIO convention
+                  DO i = 1, nsgf
+                     mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf_norm(cp2k_to_trexio_ang_mom(i), :)
+                  END DO
+
+                  DEALLOCATE (mos_cgf)
+                  DEALLOCATE (mos_sgf_norm)
                END IF
 
                ! we have to do it for the imaginary part as well
@@ -884,10 +901,21 @@ CONTAINS
                   IF (save_cartesian) THEN
                      CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mo_coefficient_im(:, imo + 1:imo + nmo))
                   ELSE
-                     ! we have to reorder the MOs since CP2K and TREXIO have different conventions
-                     DO i = 1, nsgf
-                        mo_coefficient_im(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
+                     ALLOCATE (mos_cgf(ncgf, nmo))
+                     ALLOCATE (mos_sgf_norm(nsgf, nmo))
+
+                     CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+                     DO i = 1, ncgf
+                        mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                      END DO
+                     CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf_norm)
+
+                     DO i = 1, nsgf
+                        mo_coefficient_im(i, imo + 1:imo + nmo) = mos_sgf_norm(cp2k_to_trexio_ang_mom(i), :)
+                     END DO
+
+                     DEALLOCATE (mos_cgf)
+                     DEALLOCATE (mos_sgf_norm)
                   END IF
                END IF
             END DO
@@ -910,15 +938,28 @@ CONTAINS
             IF (save_cartesian) THEN
                CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mo_coefficient(:, imo + 1:imo + nmo))
             ELSE
-               ! we have to reorder the MOs since CP2K and TREXIO have different conventions
-               DO i = 1, nsgf
-                  mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
+               ALLOCATE (mos_cgf(ncgf, nmo))
+               ALLOCATE (mos_sgf_norm(nsgf, nmo))
+
+               CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+               DO i = 1, ncgf
+                  mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                END DO
+               CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf_norm)
+
+               DO i = 1, nsgf
+                  mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf_norm(cp2k_to_trexio_ang_mom(i), :)
+               END DO
+
+               DEALLOCATE (mos_cgf)
+               DEALLOCATE (mos_sgf_norm)
             END IF
          END IF
 
          DEALLOCATE (mos_sgf)
       END DO
+
+      DEALLOCATE (norm_cgf_all)
 
       IF (ionode) THEN
          rc = trexio_write_mo_type(f, 'Canonical', LEN_TRIM('Canonical') + 1)
@@ -1583,6 +1624,63 @@ CONTAINS
       END DO ! iatom
 
    END SUBROUTINE spherical_to_cartesian_mo
+
+! **************************************************************************************************
+!> \brief Computes a cartesian to spherical MO transformation (solid harmonics in reality)
+!> \param mos_cgf the MO coefficients in Cartesian AO basis
+!> \param particle_set the set of particles in the system
+!> \param qs_kind_set the set of qs_kinds in the system
+!> \param mos_sgf the transformed MO coefficients in spherical AO basis
+! **************************************************************************************************
+   SUBROUTINE cartesian_to_spherical_mo(mos_cgf, particle_set, qs_kind_set, mos_sgf)
+      REAL(KIND=dp), DIMENSION(:, :), INTENT(IN)         :: mos_cgf
+      TYPE(particle_type), DIMENSION(:), INTENT(IN), &
+         POINTER                                         :: particle_set
+      TYPE(qs_kind_type), DIMENSION(:), INTENT(IN), &
+         POINTER                                         :: qs_kind_set
+      REAL(KIND=dp), DIMENSION(:, :), INTENT(OUT)        :: mos_sgf
+
+      INTEGER                                            :: iatom, icgf, ikind, iset, isgf, ishell, &
+                                                            lshell, ncgf, nmo, nset, nsgf
+      INTEGER, DIMENSION(:), POINTER                     :: nshell
+      INTEGER, DIMENSION(:, :), POINTER                  :: l
+      TYPE(gto_basis_set_type), POINTER                  :: orb_basis_set
+
+      CALL get_qs_kind_set(qs_kind_set, ncgf=ncgf, nsgf=nsgf)
+
+      mos_sgf = 0.0_dp
+      nmo = SIZE(mos_cgf, 2)
+
+      ! Transform Cartesian MOs to spherical MOs
+      icgf = 1
+      isgf = 1
+      DO iatom = 1, SIZE(particle_set)
+         NULLIFY (orb_basis_set)
+         CALL get_atomic_kind(particle_set(iatom)%atomic_kind, kind_number=ikind)
+         CALL get_qs_kind(qs_kind_set(ikind), basis_set=orb_basis_set)
+
+         IF (ASSOCIATED(orb_basis_set)) THEN
+            CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
+                                   nset=nset, &
+                                   nshell=nshell, &
+                                   l=l)
+            DO iset = 1, nset
+               DO ishell = 1, nshell(iset)
+                  lshell = l(ishell, iset)
+                  CALL dgemm("N", "N", nso(lshell), nmo, nco(lshell), 1.0_dp, &
+                             orbtramat(lshell)%c2s, nso(lshell), &
+                             mos_cgf(icgf, 1), ncgf, 0.0_dp, &
+                             mos_sgf(isgf, 1), nsgf)
+                  icgf = icgf + nco(lshell)
+                  isgf = isgf + nso(lshell)
+               END DO
+            END DO
+         ELSE
+            CPABORT("Unknown basis set type")
+         END IF
+      END DO ! iatom
+
+   END SUBROUTINE cartesian_to_spherical_mo
 #endif
 
 END MODULE trexio_utils
