@@ -816,7 +816,6 @@ CONTAINS
                                 nset=nset, &
                                 nshell=nshell, &
                                 norm_cgf=norm_cgf, &
-                                ncgf=ncgf_loc, &
                                 l=l_shell_set)
 
          icgf_loc = 0
