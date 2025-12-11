@@ -161,7 +161,7 @@ CONTAINS
                                                             nspins, ikind, ishell_loc, ishell, &
                                                             shell_num, prim_num, nset, iset, ipgf, z, &
                                                             sl_lmax, ecp_num, nloc, nsemiloc, sl_l, iecp, &
-                                                            igf, icgf, icgf_loc, ncgf, ngf_shell, lshell, ao_num, nmo, &
+                                                            igf, icgf, ncgf, ngf_shell, lshell, ao_num, nmo, &
                                                             mo_num, ispin, ikp, imo, ikp_loc, nsgf, &
                                                             i, j, k, l, m, unit_dE, &
                                                             row, col, row_size, col_size, &
@@ -175,8 +175,8 @@ CONTAINS
       INTEGER, DIMENSION(:), POINTER                     :: nshell, npgf
       INTEGER, DIMENSION(:, :), POINTER                  :: l_shell_set
       REAL(KIND=dp), DIMENSION(:), ALLOCATABLE           :: charge, shell_factor, exponents, coefficients, &
-                                 prim_factor, ao_normalization, mo_energy, &
-                                 mo_occupation, norm_cgf_all
+                                 prim_factor, ao_normalization, ao_normalization_for_mo, mo_energy, &
+                                 mo_occupation,
       REAL(KIND=dp), DIMENSION(:), POINTER               :: wkp, norm_cgf
       REAL(KIND=dp), DIMENSION(:, :), ALLOCATABLE        :: coord, mo_coefficient, mo_coefficient_im, &
                                                             mos_sgf, mos_cgf, dEdP, ao_overlap
@@ -637,6 +637,7 @@ CONTAINS
       ! one-to-one mapping between AOs and ...
       ALLOCATE (ao_shell(ao_num))         ! ..shells
       ALLOCATE (ao_normalization(ao_num)) ! ..normalization factors
+      ALLOCATE (ao_normalization_for_mo(ao_num)) ! ..normalization factors
 
       IF (.NOT. save_cartesian) THEN
          ! AO order map from CP2K to TREXIO convention
@@ -696,6 +697,7 @@ CONTAINS
                ELSE
                   ! spherical AOs: normalization applied via MO scaling, keep factors as unity
                   ao_normalization(igf + 1:igf + ngf_shell) = 1.0_dp
+                  ao_normalization_for_mo(igf + 1:igf + ngf_shell) = norm_cgf(icgf + 1:icgf + ngf_shell)
                END IF
 
                igf = igf + ngf_shell
@@ -779,29 +781,6 @@ CONTAINS
          END DO
          mo_num = SUM(nmo_spin)
       END IF
-
-      ! gather Cartesian normalization factors for all CGFs
-      ALLOCATE (norm_cgf_all(ncgf))
-      icgf = 0
-      DO iatom = 1, natoms
-         CALL get_atomic_kind(particle_set(iatom)%atomic_kind, kind_number=ikind)
-         CALL get_qs_kind(kind_set(ikind), basis_set=basis_set, basis_type="ORB")
-         CALL get_gto_basis_set(basis_set, &
-                                nset=nset, &
-                                nshell=nshell, &
-                                norm_cgf=norm_cgf, &
-                                l=l_shell_set)
-
-         DO iset = 1, nset
-            DO ishell_loc = 1, nshell(iset)
-               lshell = l_shell_set(ishell_loc, iset)
-               ngf_shell = nco(lshell)
-               norm_cgf_all(icgf + 1:icgf + ngf_shell) = norm_cgf(icgf + 1:icgf + ngf_shell)
-               icgf = icgf + ngf_shell
-            END DO
-         END DO
-      END DO
-      CPASSERT(icgf == ncgf)
 
       ! allocate all the arrays
       ALLOCATE (mo_coefficient(ao_num, mo_num))
@@ -903,9 +882,6 @@ CONTAINS
                   ! cartesian AOs: normalization applied via AO normalization
                   ALLOCATE (mos_cgf(ncgf, nmo))
                   CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-                  !DO i = 1, ncgf
-                  !   mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-                  !END DO
                   mo_coefficient(:, imo + 1:imo + nmo) = mos_cgf(:, :)
                   DEALLOCATE (mos_cgf)
                ELSE
@@ -913,7 +889,7 @@ CONTAINS
                   ALLOCATE (mos_cgf(ncgf, nmo))
                   CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
                   DO i = 1, ncgf
-                     mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+                     mos_cgf(i, :) = mos_cgf(i, :)*ao_normalization_for_mo(:)
                   END DO
                   CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                   DO i = 1, nsgf
@@ -929,9 +905,6 @@ CONTAINS
                      ! cartesian AOs: normalization applied via AO normalization
                      ALLOCATE (mos_cgf(ncgf, nmo))
                      CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-                     !DO i = 1, ncgf
-                     !   mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-                     !END DO
                      mo_coefficient_im(:, imo + 1:imo + nmo) = mos_cgf(:, :)
                      DEALLOCATE (mos_cgf)
                   ELSE
@@ -939,7 +912,7 @@ CONTAINS
                      ALLOCATE (mos_cgf(ncgf, nmo))
                      CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
                      DO i = 1, ncgf
-                        mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+                        mos_cgf(i, :) = mos_cgf(i, :)*ao_normalization_for_mo(:)
                      END DO
                      CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                      DO i = 1, nsgf
@@ -969,9 +942,6 @@ CONTAINS
                ! cartesian AOs: normalization applied via AO normalization
                ALLOCATE (mos_cgf(ncgf, nmo))
                CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-               !DO i = 1, ncgf
-               !   mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-               !END DO
                mo_coefficient(:, imo + 1:imo + nmo) = mos_cgf(:, :)
                DEALLOCATE (mos_cgf)
             ELSE
@@ -979,7 +949,7 @@ CONTAINS
                ALLOCATE (mos_cgf(ncgf, nmo))
                CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
                DO i = 1, ncgf
-                  mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+                  mos_cgf(i, :) = mos_cgf(i, :)*ao_normalization_for_mo(:)
                END DO
                CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                DO i = 1, nsgf
@@ -992,7 +962,7 @@ CONTAINS
          DEALLOCATE (mos_sgf)
       END DO
 
-      DEALLOCATE (norm_cgf_all)
+      DEALLOCATE (ao_normalization_for_mo)
 
       IF (ionode) THEN
          rc = trexio_write_mo_type(f, 'Canonical', LEN_TRIM('Canonical') + 1)
