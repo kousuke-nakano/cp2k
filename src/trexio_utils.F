@@ -161,7 +161,7 @@ CONTAINS
                                                             nspins, ikind, ishell_loc, ishell, &
                                                             shell_num, prim_num, nset, iset, ipgf, z, &
                                                             sl_lmax, ecp_num, nloc, nsemiloc, sl_l, iecp, &
-                                                            igf, icgf, ncgf, ngf_shell, lshell, ao_num, nmo, &
+                                                            igf, igf_c,icgf, ncgf, ngf_shell, lshell, ao_num, nmo, &
                                                             mo_num, ispin, ikp, imo, ikp_loc, nsgf, &
                                                             i, j, k, l, m, unit_dE, &
                                                             row, col, row_size, col_size, &
@@ -659,6 +659,7 @@ CONTAINS
       ! we need to be consistent with the basis group on the shell indices
       ishell = 0  ! global shell index
       igf = 0     ! global AO index
+      igf_c = 0
       DO iatom = 1, natoms
          ! get the qs_kind (index position in kind_set) for this atom (atomic_kind)
          CALL get_atomic_kind(particle_set(iatom)%atomic_kind, kind_number=ikind)
@@ -697,10 +698,11 @@ CONTAINS
                ELSE
                   ! spherical AOs: normalization applied via MO scaling, keep factors as unity
                   ao_normalization(igf + 1:igf + ngf_shell) = 1.0_dp
-                  ao_normalization_for_mo(igf + 1:igf + ngf_shell) = norm_cgf(icgf + 1:icgf + ngf_shell)
+                  ao_normalization_for_mo(igf_c + 1:igf_c + nco(lshell)) = norm_cgf(icgf + 1:icgf + nco(lshell))
                END IF
 
                igf = igf + ngf_shell
+               igf_c = igf_c + nco(lshell)
                icgf = icgf + nco(lshell)
             END DO
          END DO
