@@ -889,7 +889,7 @@ CONTAINS
                   ALLOCATE (mos_cgf(ncgf, nmo))
                   CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
                   DO i = 1, ncgf
-                     mos_cgf(i, :) = mos_cgf(i, :)*ao_normalization_for_mo(:)
+                     mos_cgf(i, :) = mos_cgf(i, :)*ao_normalization_for_mo(i)
                   END DO
                   CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                   DO i = 1, nsgf
@@ -912,7 +912,7 @@ CONTAINS
                      ALLOCATE (mos_cgf(ncgf, nmo))
                      CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
                      DO i = 1, ncgf
-                        mos_cgf(i, :) = mos_cgf(i, :)*ao_normalization_for_mo(:)
+                        mos_cgf(i, :) = mos_cgf(i, :)*ao_normalization_for_mo(i)
                      END DO
                      CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                      DO i = 1, nsgf
@@ -949,7 +949,7 @@ CONTAINS
                ALLOCATE (mos_cgf(ncgf, nmo))
                CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
                DO i = 1, ncgf
-                  mos_cgf(i, :) = mos_cgf(i, :)*ao_normalization_for_mo(:)
+                  mos_cgf(i, :) = mos_cgf(i, :)*ao_normalization_for_mo(i)
                END DO
                CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                DO i = 1, nsgf
