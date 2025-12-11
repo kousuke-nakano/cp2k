@@ -176,7 +176,7 @@ CONTAINS
       INTEGER, DIMENSION(:, :), POINTER                  :: l_shell_set
       REAL(KIND=dp), DIMENSION(:), ALLOCATABLE           :: charge, shell_factor, exponents, coefficients, &
                                  prim_factor, ao_normalization, ao_normalization_for_mo, mo_energy, &
-                                 mo_occupation,
+                                 mo_occupation
       REAL(KIND=dp), DIMENSION(:), POINTER               :: wkp, norm_cgf
       REAL(KIND=dp), DIMENSION(:, :), ALLOCATABLE        :: coord, mo_coefficient, mo_coefficient_im, &
                                                             mos_sgf, mos_cgf, dEdP, ao_overlap
@@ -637,7 +637,7 @@ CONTAINS
       ! one-to-one mapping between AOs and ...
       ALLOCATE (ao_shell(ao_num))         ! ..shells
       ALLOCATE (ao_normalization(ao_num)) ! ..normalization factors
-      ALLOCATE (ao_normalization_for_mo(ao_num)) ! ..normalization factors
+      ALLOCATE (ao_normalization_for_mo(ncgf)) ! ..normalization factors
 
       IF (.NOT. save_cartesian) THEN
          ! AO order map from CP2K to TREXIO convention
