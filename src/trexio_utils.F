@@ -792,14 +792,12 @@ CONTAINS
                                 norm_cgf=norm_cgf, &
                                 l=l_shell_set)
 
-         icgf_loc = 0
          DO iset = 1, nset
             DO ishell_loc = 1, nshell(iset)
                lshell = l_shell_set(ishell_loc, iset)
                ngf_shell = nco(lshell)
-               norm_cgf_all(icgf + 1:icgf + ngf_shell) = norm_cgf(icgf_loc + 1:icgf_loc + ngf_shell)
+               norm_cgf_all(icgf + 1:icgf + ngf_shell) = norm_cgf(icgf + 1:icgf + ngf_shell)
                icgf = icgf + ngf_shell
-               icgf_loc = icgf_loc + ngf_shell
             END DO
          END DO
       END DO
