@@ -691,6 +691,7 @@ CONTAINS
                ao_shell(igf + 1:igf + ngf_shell) = ishell
 
                IF (save_cartesian) THEN
+                  ! cartesian AOs: normalization applied here
                   ao_normalization(igf + 1:igf + ngf_shell) = norm_cgf(icgf + 1:icgf + ngf_shell)
                ELSE
                   ! spherical AOs: normalization applied via MO scaling, keep factors as unity
@@ -901,20 +902,22 @@ CONTAINS
                ! transform and store the MO coefficients
                CALL cp_fm_get_submatrix(fm_mo_coeff, mos_sgf, 1, imo + 1, nsgf, nmo)
                IF (save_cartesian) THEN
+                  ! cartesian AOs: normalization applied via AO normalization
+                  ALLOCATE (mos_cgf(ncgf, nmo))
+                  CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
+                  !DO i = 1, ncgf
+                  !   mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+                  !END DO
+                  mo_coefficient(:, imo + 1:imo + nmo) = mos_cgf(:, :)
+                  DEALLOCATE (mos_cgf)
+               ELSE
+                  ! spherical AOs: normalization applied via MO scaling
                   ALLOCATE (mos_cgf(ncgf, nmo))
                   CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
                   DO i = 1, ncgf
                      mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                   END DO
-                  mo_coefficient(:, imo + 1:imo + nmo) = mos_cgf(:, :)
-                  DEALLOCATE (mos_cgf)
-               ELSE
-                  ALLOCATE (mos_cgf(ncgf, nmo))
-                  CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-                     DO i = 1, ncgf
-                        mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-                     END DO
-                     CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+                  CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                   DO i = 1, nsgf
                      mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                   END DO
@@ -925,14 +928,16 @@ CONTAINS
                IF (.NOT. use_real_wfn) THEN
                   CALL cp_fm_get_submatrix(fm_mo_coeff_im, mos_sgf, 1, imo + 1, nsgf, nmo)
                   IF (save_cartesian) THEN
+                     ! cartesian AOs: normalization applied via AO normalization
                      ALLOCATE (mos_cgf(ncgf, nmo))
                      CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-                     DO i = 1, ncgf
-                        mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-                     END DO
+                     !DO i = 1, ncgf
+                     !   mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+                     !END DO
                      mo_coefficient_im(:, imo + 1:imo + nmo) = mos_cgf(:, :)
                      DEALLOCATE (mos_cgf)
                   ELSE
+                     ! spherical AOs: normalization applied via MO scaling
                      ALLOCATE (mos_cgf(ncgf, nmo))
                      CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
                      DO i = 1, ncgf
@@ -963,20 +968,22 @@ CONTAINS
             CALL cp_fm_get_submatrix(mos(ispin)%mo_coeff, mos_sgf)
 
             IF (save_cartesian) THEN
+               ! cartesian AOs: normalization applied via AO normalization
                ALLOCATE (mos_cgf(ncgf, nmo))
                CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
-               DO i = 1, ncgf
-                  mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
-               END DO
+               !DO i = 1, ncgf
+               !   mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
+               !END DO
                mo_coefficient(:, imo + 1:imo + nmo) = mos_cgf(:, :)
                DEALLOCATE (mos_cgf)
             ELSE
+               ! spherical AOs: normalization applied via MO scaling
                ALLOCATE (mos_cgf(ncgf, nmo))
                CALL spherical_to_cartesian_mo(mos_sgf, particle_set, kind_set, mos_cgf)
                DO i = 1, ncgf
                   mos_cgf(i, :) = mos_cgf(i, :)*norm_cgf_all(i)
                END DO
-                  CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
+               CALL cartesian_to_spherical_mo(mos_cgf, particle_set, kind_set, mos_sgf)
                DO i = 1, nsgf
                   mo_coefficient(i, imo + 1:imo + nmo) = mos_sgf(cp2k_to_trexio_ang_mom(i), :)
                END DO
