@@ -1621,7 +1621,7 @@ CONTAINS
       mos_cgf = 0.0_dp
       nmo = SIZE(mos_sgf, 2)
 
-      ! Transform spherical MOs to Cartesian MOs
+      ! Transform spherical MOs to Cartesian MOs using s2c
       icgf = 1
       isgf = 1
       DO iatom = 1, SIZE(particle_set)
@@ -1638,7 +1638,7 @@ CONTAINS
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
                   CALL dgemm("T", "N", nco(lshell), nmo, nso(lshell), 1.0_dp, &
-                             orbtramat(lshell)%c2s, nso(lshell), &
+                             orbtramat(lshell)%s2c, nso(lshell), &
                              mos_sgf(isgf, 1), nsgf, 0.0_dp, &
                              mos_cgf(icgf, 1), ncgf)
                   icgf = icgf + nco(lshell)
