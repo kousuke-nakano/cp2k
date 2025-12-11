@@ -1621,7 +1621,7 @@ CONTAINS
       mos_cgf = 0.0_dp
       nmo = SIZE(mos_sgf, 2)
 
-      ! Transform spherical MOs to Cartesian MOs using s2c
+      ! Transform spherical MOs to Cartesian MOs using
       icgf = 1
       isgf = 1
       DO iatom = 1, SIZE(particle_set)
@@ -1649,7 +1649,7 @@ CONTAINS
             ! assume atom without basis set
             CPABORT("Unknown basis set type")
          END IF
-      END DO ! iatom
+      END DO !iatom
 
    END SUBROUTINE spherical_to_cartesian_mo
 
@@ -1696,7 +1696,7 @@ CONTAINS
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
                   CALL dgemm("N", "N", nso(lshell), nmo, nco(lshell), 1.0_dp, &
-                             orbtramat(lshell)%c2s, nso(lshell), &
+                             orbtramat(lshell)%c2s, nco(lshell), &
                              mos_cgf(icgf, 1), ncgf, 0.0_dp, &
                              mos_sgf(isgf, 1), nsgf)
                   icgf = icgf + nco(lshell)
