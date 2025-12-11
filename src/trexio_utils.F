@@ -1696,7 +1696,7 @@ CONTAINS
                DO ishell = 1, nshell(iset)
                   lshell = l(ishell, iset)
                   CALL dgemm("N", "N", nso(lshell), nmo, nco(lshell), 1.0_dp, &
-                             orbtramat(lshell)%c2s, nco(lshell), &
+                             orbtramat(lshell)%c2s, nso(lshell), &  ! c2s stored as (nso x nco)
                              mos_cgf(icgf, 1), ncgf, 0.0_dp, &
                              mos_sgf(isgf, 1), nsgf)
                   icgf = icgf + nco(lshell)
